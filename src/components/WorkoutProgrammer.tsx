@@ -117,7 +117,7 @@ const WorkoutProgrammer: React.FC = () => {
         const targetData = await targetRes.json();
         setTargetMuscles(['all', ...targetData]);
 
-        const exercisesRes = await fetch(`${API_BASE}`, API_OPTIONS);
+        const exercisesRes = await fetch(`${API_BASE}?limit=2000`, API_OPTIONS);
         const exercisesData = await exercisesRes.json();
         setExercises(exercisesData);
 
