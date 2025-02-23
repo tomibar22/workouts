@@ -2,9 +2,15 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
-import { Search, Dumbbell, Target, Activity, X, Plus, Save, Loader2 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
-import { useUser } from '@supabase/auth-helpers-react';
+import { Search, Dumbbell, Target, Activity, X, Plus, Save, Loader2, LogOut } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
+import { Auth } from '@supabase/auth-ui-react';
+import { ThemeSupa } from '@supabase/auth-ui-shared';
+
+// Initialize Supabase client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface Exercise {
   id: string;
@@ -27,7 +33,7 @@ interface Workout {
 }
 
 const WorkoutProgrammer = () => {
-  const user = useUser();
+  const [session, setSession] = useState<any>(null);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [bodyParts, setBodyParts] = useState<string[]>([]);
   const [equipment, setEquipment] = useState<string[]>([]);
@@ -63,15 +69,31 @@ const WorkoutProgrammer = () => {
     }
   }), []);
 
+  // Check for session
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   // Load workouts from Supabase
   useEffect(() => {
     const loadWorkouts = async () => {
-      if (!user) return;
+      if (!session?.user) return;
       
       try {
         const { data, error } = await supabase
           .from('workouts')
           .select('*')
+          .eq('user_id', session.user.id)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -83,7 +105,7 @@ const WorkoutProgrammer = () => {
     };
 
     loadWorkouts();
-  }, [user]);
+  }, [session]);
 
   // Fetch initial exercises data
   useEffect(() => {
@@ -159,7 +181,7 @@ const WorkoutProgrammer = () => {
   };
 
   const saveWorkout = async () => {
-    if (!user) {
+    if (!session?.user) {
       alert('Please sign in to save workouts');
       return;
     }
@@ -171,7 +193,7 @@ const WorkoutProgrammer = () => {
           .from('workouts')
           .insert([
             {
-              user_id: user.id,
+              user_id: session.user.id,
               name: currentWorkout.name,
               exercises: currentWorkout.exercises
             }
@@ -191,6 +213,49 @@ const WorkoutProgrammer = () => {
       }
     }
   };
+
+  const handleSignOut = () => {
+    supabase.auth.signOut();
+  };
+
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-gray-800/50 rounded-xl border border-gray-700/50 backdrop-blur-sm p-6">
+          <h1 className="text-2xl font-bold mb-6 text-center bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+            Sign in to Workout Programmer
+          </h1>
+          <Auth
+            supabaseClient={supabase}
+            appearance={{
+              theme: ThemeSupa,
+              variables: {
+                default: {
+                  colors: {
+                    brand: '#3b82f6',
+                    brandAccent: '#2563eb',
+                  },
+                },
+              },
+              style: {
+                button: {
+                  background: '#3b82f6',
+                  borderRadius: '8px',
+                  padding: '10px',
+                },
+                input: {
+                  background: 'rgba(31, 41, 55, 0.5)',
+                  borderRadius: '8px',
+                },
+              },
+            }}
+            theme="dark"
+            providers={['github', 'google']}
+          />
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -217,11 +282,17 @@ const WorkoutProgrammer = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-gray-100 p-6 space-y-8">
       <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+        <div className="flex justify-between items-center mb-12">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
             Workout Programmer
           </h1>
-          <p className="text-gray-400">Design and track your perfect workout routine</p>
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-colors"
+          >
+            <LogOut size={20} />
+            Sign Out
+          </button>
         </div>
         
         {/* Workout Name Input */}
@@ -316,6 +387,10 @@ const WorkoutProgrammer = () => {
                         fill
                         className="object-contain"
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = '/placeholder-exercise.png';
+                        }}
                       />
                     </div>
                     <div className="p-3 flex flex-col flex-grow">
@@ -379,6 +454,10 @@ const WorkoutProgrammer = () => {
                           fill
                           className="object-contain"
                           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = '/placeholder-exercise.png';
+                          }}
                         />
                       </div>
                       <div className="grid grid-cols-3 gap-3">
@@ -468,6 +547,10 @@ const WorkoutProgrammer = () => {
                             fill
                             className="object-cover"
                             sizes="(max-width: 768px) 80px, 80px"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.src = '/placeholder-exercise.png';
+                            }}
                           />
                         </div>
                         <div className="flex-grow">

@@ -1,5 +1,5 @@
-import WorkoutProgrammer from '@/components/WorkoutProgrammer'
+import WorkoutApp from '@/components/WorkoutApp'
 
 export default function Home() {
-  return <WorkoutProgrammer />
+  return <WorkoutApp />
 }
