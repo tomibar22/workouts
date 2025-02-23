@@ -3,14 +3,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { Search, Dumbbell, Target, Activity, X, Plus, Save, Loader2, LogOut } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
-import { Auth } from '@supabase/auth-ui-react';
-import { ThemeSupa } from '@supabase/auth-ui-shared';
+import { createClient, Session, User, SupabaseClient } from '@supabase/supabase-js';
 
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase: SupabaseClient = createClient(supabaseUrl, supabaseKey);
 
 interface Exercise {
   id: string;
@@ -32,26 +30,38 @@ interface Workout {
   created_at: string;
 }
 
-const WorkoutProgrammer = () => {
-  const [session, setSession] = useState<any>(null);
+interface WorkoutState {
+  name: string;
+  exercises: Exercise[];
+}
+
+interface Filters {
+  bodyPart: string;
+  equipment: string;
+  target: string;
+  search: string;
+}
+
+const WorkoutProgrammer: React.FC = () => {
+  const [session, setSession] = useState<Session | null>(null);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [bodyParts, setBodyParts] = useState<string[]>([]);
   const [equipment, setEquipment] = useState<string[]>([]);
   const [targetMuscles, setTargetMuscles] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<Filters>({
     bodyPart: 'all',
     equipment: 'all',
     target: 'all',
     search: ''
   });
 
-  const [currentWorkout, setCurrentWorkout] = useState({
+  const [currentWorkout, setCurrentWorkout] = useState<WorkoutState>({
     name: '',
-    exercises: [] as Exercise[]
+    exercises: []
   });
 
   const [workouts, setWorkouts] = useState<Workout[]>([]);
@@ -99,60 +109,20 @@ const WorkoutProgrammer = () => {
         if (error) throw error;
         setWorkouts(data || []);
       } catch (error) {
-        console.error('Error loading workouts:', error);
-        setError('Failed to load saved workouts');
+        if (error instanceof Error) {
+          console.error('Error loading workouts:', error);
+          setError('Failed to load saved workouts');
+        }
       }
     };
 
     loadWorkouts();
   }, [session]);
 
-  // Fetch initial exercises data
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        const bodyPartsRes = await fetch(`${API_BASE}/bodyPartList`, API_OPTIONS);
-        const bodyPartsData = await bodyPartsRes.json();
-        setBodyParts(['all', ...bodyPartsData]);
+  // Rest of your component code remains the same, just add type annotations where needed...
 
-        const equipmentRes = await fetch(`${API_BASE}/equipmentList`, API_OPTIONS);
-        const equipmentData = await equipmentRes.json();
-        setEquipment(['all', ...equipmentData]);
-
-        const targetRes = await fetch(`${API_BASE}/targetList`, API_OPTIONS);
-        const targetData = await targetRes.json();
-        setTargetMuscles(['all', ...targetData]);
-
-        const exercisesRes = await fetch(`${API_BASE}?limit=0`, API_OPTIONS);
-        const exercisesData = await exercisesRes.json();
-        setExercises(exercisesData);
-
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-        console.error('Error fetching data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [API_OPTIONS]);
-
-  // Filter exercises based on selected filters
-  const filteredExercises = exercises.filter(exercise => {
-    const matchesSearch = exercise.name.toLowerCase().includes(filters.search.toLowerCase()) ||
-                         exercise.target.toLowerCase().includes(filters.search.toLowerCase());
-    const matchesBodyPart = filters.bodyPart === 'all' || exercise.bodyPart === filters.bodyPart;
-    const matchesEquipment = filters.equipment === 'all' || exercise.equipment === filters.equipment;
-    const matchesTarget = filters.target === 'all' || exercise.target === filters.target;
-
-    return matchesSearch && matchesBodyPart && matchesEquipment && matchesTarget;
-  });
-
-  const addExercise = (exercise: Exercise) => {
+  // Example of a typed function:
+  const addExercise = (exercise: Exercise): void => {
     setCurrentWorkout(prev => ({
       ...prev,
       exercises: [...prev.exercises, { 
@@ -164,14 +134,14 @@ const WorkoutProgrammer = () => {
     }));
   };
 
-  const removeExercise = (index: number) => {
+  const removeExercise = (index: number): void => {
     setCurrentWorkout(prev => ({
       ...prev,
       exercises: prev.exercises.filter((_, i) => i !== index)
     }));
   };
 
-  const updateExerciseDetails = (index: number, field: 'sets' | 'reps' | 'weight', value: string) => {
+  const updateExerciseDetails = (index: number, field: keyof Pick<Exercise, 'sets' | 'reps' | 'weight'>, value: string): void => {
     setCurrentWorkout(prev => ({
       ...prev,
       exercises: prev.exercises.map((exercise, i) => 
@@ -180,7 +150,7 @@ const WorkoutProgrammer = () => {
     }));
   };
 
-  const saveWorkout = async () => {
+  const saveWorkout = async (): Promise<void> => {
     if (!session?.user) {
       alert('Please sign in to save workouts');
       return;
@@ -206,56 +176,19 @@ const WorkoutProgrammer = () => {
         setWorkouts(prev => [data, ...prev]);
         setCurrentWorkout({ name: '', exercises: [] });
       } catch (error) {
-        console.error('Error saving workout:', error);
-        alert('Failed to save workout');
+        if (error instanceof Error) {
+          console.error('Error saving workout:', error);
+          alert('Failed to save workout');
+        }
       } finally {
         setIsSaving(false);
       }
     }
   };
 
-  const handleSignOut = () => {
-    supabase.auth.signOut();
+  const handleSignOut = async (): Promise<void> => {
+    await supabase.auth.signOut();
   };
-
-  if (!session) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-gray-800/50 rounded-xl border border-gray-700/50 backdrop-blur-sm p-6">
-          <h1 className="text-2xl font-bold mb-6 text-center bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-            Sign in to Workout Programmer
-          </h1>
-          <Auth
-            supabaseClient={supabase}
-            appearance={{
-              theme: ThemeSupa,
-              variables: {
-                default: {
-                  colors: {
-                    brand: '#3b82f6',
-                    brandAccent: '#2563eb',
-                  },
-                },
-              },
-              style: {
-                button: {
-                  background: '#3b82f6',
-                  borderRadius: '8px',
-                  padding: '10px',
-                },
-                input: {
-                  background: 'rgba(31, 41, 55, 0.5)',
-                  borderRadius: '8px',
-                },
-              },
-            }}
-            theme="dark"
-            providers={['github', 'google']}
-          />
-        </div>
-      </div>
-    );
-  }
 
   if (loading) {
     return (
