@@ -6,8 +6,8 @@ import { Search, Dumbbell, Target, Activity, X, Plus, Save, Loader2, LogOut } fr
 import { createClient, Session, SupabaseClient } from '@supabase/supabase-js';
 
 // Initialize Supabase client
-const supabaseUrl = "https://nsrxmfudvgjbhuvtatxp.supabase.co"
-const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zcnhtZnVkdmdqYmh1dnRhdHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAzMDYxMjMsImV4cCI6MjA1NTg4MjEyM30.dPlggKcsE9vpasjxaI3D_gj967vV8U-x3LcBwsWPfwY"
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase: SupabaseClient = createClient(supabaseUrl, supabaseKey);
 
 interface Exercise {
