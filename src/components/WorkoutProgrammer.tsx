@@ -1,18 +1,39 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { Search, Dumbbell, Target, Activity, X, Plus, Save, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useUser } from '@supabase/auth-helpers-react';
 
+interface Exercise {
+  id: string;
+  name: string;
+  gifUrl: string;
+  bodyPart: string;
+  equipment: string;
+  target: string;
+  sets?: number;
+  reps?: number;
+  weight?: number;
+}
+
+interface Workout {
+  id: string;
+  name: string;
+  exercises: Exercise[];
+  user_id: string;
+  created_at: string;
+}
+
 const WorkoutProgrammer = () => {
   const user = useUser();
-  const [exercises, setExercises] = useState([]);
-  const [bodyParts, setBodyParts] = useState([]);
-  const [equipment, setEquipment] = useState([]);
-  const [targetMuscles, setTargetMuscles] = useState([]);
+  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [bodyParts, setBodyParts] = useState<string[]>([]);
+  const [equipment, setEquipment] = useState<string[]>([]);
+  const [targetMuscles, setTargetMuscles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   
   const [filters, setFilters] = useState({
@@ -24,10 +45,10 @@ const WorkoutProgrammer = () => {
 
   const [currentWorkout, setCurrentWorkout] = useState({
     name: '',
-    exercises: []
+    exercises: [] as Exercise[]
   });
 
-  const [workouts, setWorkouts] = useState([]);
+  const [workouts, setWorkouts] = useState<Workout[]>([]);
 
   // API configuration
   const API_BASE = 'https://exercisedb.p.rapidapi.com/exercises';
@@ -70,29 +91,25 @@ const WorkoutProgrammer = () => {
       try {
         setLoading(true);
         
-        // Fetch body parts list
         const bodyPartsRes = await fetch(`${API_BASE}/bodyPartList`, API_OPTIONS);
         const bodyPartsData = await bodyPartsRes.json();
         setBodyParts(['all', ...bodyPartsData]);
 
-        // Fetch equipment list  
         const equipmentRes = await fetch(`${API_BASE}/equipmentList`, API_OPTIONS);
         const equipmentData = await equipmentRes.json();
         setEquipment(['all', ...equipmentData]);
 
-        // Fetch target muscles list
         const targetRes = await fetch(`${API_BASE}/targetList`, API_OPTIONS);
         const targetData = await targetRes.json();
         setTargetMuscles(['all', ...targetData]);
 
-        // Fetch initial exercises
         const exercisesRes = await fetch(`${API_BASE}?limit=0`, API_OPTIONS);
         const exercisesData = await exercisesRes.json();
         setExercises(exercisesData);
 
         setError(null);
       } catch (err) {
-        setError(err.message);
+        setError(err instanceof Error ? err.message : 'An error occurred');
         console.error('Error fetching data:', err);
       } finally {
         setLoading(false);
@@ -113,7 +130,7 @@ const WorkoutProgrammer = () => {
     return matchesSearch && matchesBodyPart && matchesEquipment && matchesTarget;
   });
 
-  const addExercise = (exercise) => {
+  const addExercise = (exercise: Exercise) => {
     setCurrentWorkout(prev => ({
       ...prev,
       exercises: [...prev.exercises, { 
@@ -125,14 +142,14 @@ const WorkoutProgrammer = () => {
     }));
   };
 
-  const removeExercise = (index) => {
+  const removeExercise = (index: number) => {
     setCurrentWorkout(prev => ({
       ...prev,
       exercises: prev.exercises.filter((_, i) => i !== index)
     }));
   };
 
-  const updateExerciseDetails = (index, field, value) => {
+  const updateExerciseDetails = (index: number, field: 'sets' | 'reps' | 'weight', value: string) => {
     setCurrentWorkout(prev => ({
       ...prev,
       exercises: prev.exercises.map((exercise, i) => 
@@ -281,6 +298,57 @@ const WorkoutProgrammer = () => {
           {/* Exercise List */}
           <div className="bg-gray-800/50 rounded-xl border border-gray-700/50 backdrop-blur-sm">
             <div className="p-6 border-b border-gray-700/50">
+              <h2 className="text-xl font-semibold text-blue-400 flex items-center justify-between">
+                <span>Exercise Database</span>
+                <span className="text-sm px-3 py-1 bg-blue-500/10 rounded-full text-blue-400">
+                  {filteredExercises.length} exercises
+                </span>
+              </h2>
+            </div>
+            <div className="p-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-[calc(100vh-20rem)] overflow-y-auto pr-2">
+                {filteredExercises.map(exercise => (
+                  <div key={exercise.id} className="group bg-gray-700/50 rounded-lg overflow-hidden hover:bg-gray-700 transition-all duration-300 flex flex-col h-72">
+                    <div className="bg-gray-800/50 w-full h-40 overflow-hidden relative">
+                      <Image 
+                        src={exercise.gifUrl} 
+                        alt={exercise.name}
+                        fill
+                        className="object-contain"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      />
+                    </div>
+                    <div className="p-3 flex flex-col flex-grow">
+                      <div className="flex justify-between items-start">
+                        <h3 className="font-medium text-sm mb-2 line-clamp-2">{exercise.name}</h3>
+                        <button
+                          onClick={() => addExercise(exercise)}
+                          className="bg-blue-600 text-white p-1.5 rounded-lg hover:bg-blue-700 transition-colors group-hover:scale-105 duration-300 flex-shrink-0 ml-2"
+                        >
+                          <Plus size={16} />
+                        </button>
+                      </div>
+                      <div className="mt-auto space-y-0.5">
+                        <p className="text-xs text-gray-400 flex items-center gap-1">
+                          <Target size={12} /> {exercise.target}
+                        </p>
+                        <p className="text-xs text-gray-400 flex items-center gap-1">
+                          <Dumbbell size={12} /> {exercise.equipment}
+                        </p>
+                        <p className="text-xs text-gray-400 flex items-center gap-1">
+                          <Activity size={12} /> {exercise.bodyPart}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Current Workout */}
+          <div className="bg-gray-800/50 rounded-xl border border-gray-700/50 backdrop-blur-sm">
+            <div className="p-6 border-b border-gray-700/50">
               <h2 className="text-xl font-semibold text-blue-400">Current Workout</h2>
             </div>
             <div className="p-4">
@@ -304,12 +372,13 @@ const WorkoutProgrammer = () => {
                           <X size={20} />
                         </button>
                       </div>
-                      <div className="bg-gray-800/50 rounded-lg overflow-hidden mb-4">
-                        <img 
+                      <div className="bg-gray-800/50 rounded-lg overflow-hidden mb-4 relative h-40">
+                        <Image 
                           src={exercise.gifUrl} 
                           alt={exercise.name}
-                          className="w-full h-40 object-contain"
-                          loading="lazy"
+                          fill
+                          className="object-contain"
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                         />
                       </div>
                       <div className="grid grid-cols-3 gap-3">
@@ -392,12 +461,13 @@ const WorkoutProgrammer = () => {
                   <div className="grid gap-4">
                     {workout.exercises.map((exercise, index) => (
                       <div key={index} className="flex items-center gap-4 bg-gray-800/50 rounded-lg p-3">
-                        <div className="w-20 h-20 bg-gray-900/50 rounded-lg overflow-hidden flex-shrink-0">
-                          <img 
+                        <div className="w-20 h-20 bg-gray-900/50 rounded-lg overflow-hidden flex-shrink-0 relative">
+                          <Image 
                             src={exercise.gifUrl} 
                             alt={exercise.name}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 768px) 80px, 80px"
                           />
                         </div>
                         <div className="flex-grow">
