@@ -4,9 +4,9 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'api.exercisedb.io',
+        hostname: 'v2.exercisedb.io',
         port: '',
-        pathname: '/**',
+        pathname: '/image/**',
       },
     ],
   },
