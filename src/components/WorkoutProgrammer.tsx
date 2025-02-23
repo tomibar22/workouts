@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { Search, Dumbbell, Target, Activity, X, Plus, Save, Loader2, LogOut } from 'lucide-react';
-import { createClient, Session, User, SupabaseClient } from '@supabase/supabase-js';
+import { createClient, Session, SupabaseClient } from '@supabase/supabase-js';
 
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -116,10 +116,53 @@ const WorkoutProgrammer: React.FC = () => {
       }
     };
 
+
     loadWorkouts();
   }, [session]);
 
-  // Rest of your component code remains the same, just add type annotations where needed...
+  // Add this after your existing useEffects
+useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        
+        const bodyPartsRes = await fetch(`${API_BASE}/bodyPartList`, API_OPTIONS);
+        const bodyPartsData = await bodyPartsRes.json();
+        setBodyParts(['all', ...bodyPartsData]);
+  
+        const equipmentRes = await fetch(`${API_BASE}/equipmentList`, API_OPTIONS);
+        const equipmentData = await equipmentRes.json();
+        setEquipment(['all', ...equipmentData]);
+  
+        const targetRes = await fetch(`${API_BASE}/targetList`, API_OPTIONS);
+        const targetData = await targetRes.json();
+        setTargetMuscles(['all', ...targetData]);
+  
+        const exercisesRes = await fetch(`${API_BASE}`, API_OPTIONS);
+        const exercisesData = await exercisesRes.json();
+        setExercises(exercisesData);
+  
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+        console.error('Error fetching data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+  
+    fetchData();
+  }, [API_OPTIONS]);
+
+  const filteredExercises = exercises.filter(exercise => {
+    const matchesSearch = exercise.name.toLowerCase().includes(filters.search.toLowerCase()) ||
+                         exercise.target.toLowerCase().includes(filters.search.toLowerCase());
+    const matchesBodyPart = filters.bodyPart === 'all' || exercise.bodyPart === filters.bodyPart;
+    const matchesEquipment = filters.equipment === 'all' || exercise.equipment === filters.equipment;
+    const matchesTarget = filters.target === 'all' || exercise.target === filters.target;
+  
+    return matchesSearch && matchesBodyPart && matchesEquipment && matchesTarget;
+  });
 
   // Example of a typed function:
   const addExercise = (exercise: Exercise): void => {
