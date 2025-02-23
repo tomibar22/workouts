@@ -2,13 +2,13 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
-import { Search, Dumbbell, Target, Activity, X, Plus, Save, Loader2, LogOut } from 'lucide-react';
-import { createClient, Session, SupabaseClient } from '@supabase/supabase-js';
+import { Search, Dumbbell, Target, Activity, X, Plus, Save, Loader2 } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase: SupabaseClient = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface Exercise {
   id: string;
@@ -26,7 +26,6 @@ interface Workout {
   id: string;
   name: string;
   exercises: Exercise[];
-  user_id: string;
   created_at: string;
 }
 
@@ -43,7 +42,6 @@ interface Filters {
 }
 
 const WorkoutProgrammer: React.FC = () => {
-  const [session, setSession] = useState<Session | null>(null);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [bodyParts, setBodyParts] = useState<string[]>([]);
   const [equipment, setEquipment] = useState<string[]>([]);
@@ -79,31 +77,13 @@ const WorkoutProgrammer: React.FC = () => {
     }
   }), []);
 
-  // Check for session
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
   // Load workouts from Supabase
   useEffect(() => {
     const loadWorkouts = async () => {
-      if (!session?.user) return;
-      
       try {
         const { data, error } = await supabase
           .from('workouts')
           .select('*')
-          .eq('user_id', session.user.id)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -116,12 +96,11 @@ const WorkoutProgrammer: React.FC = () => {
       }
     };
 
-
     loadWorkouts();
-  }, [session]);
+  }, []);
 
-  // Add this after your existing useEffects
-useEffect(() => {
+  // Fetch initial exercises data
+  useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
@@ -129,19 +108,19 @@ useEffect(() => {
         const bodyPartsRes = await fetch(`${API_BASE}/bodyPartList`, API_OPTIONS);
         const bodyPartsData = await bodyPartsRes.json();
         setBodyParts(['all', ...bodyPartsData]);
-  
+
         const equipmentRes = await fetch(`${API_BASE}/equipmentList`, API_OPTIONS);
         const equipmentData = await equipmentRes.json();
         setEquipment(['all', ...equipmentData]);
-  
+
         const targetRes = await fetch(`${API_BASE}/targetList`, API_OPTIONS);
         const targetData = await targetRes.json();
         setTargetMuscles(['all', ...targetData]);
-  
+
         const exercisesRes = await fetch(`${API_BASE}`, API_OPTIONS);
         const exercisesData = await exercisesRes.json();
         setExercises(exercisesData);
-  
+
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
@@ -150,21 +129,21 @@ useEffect(() => {
         setLoading(false);
       }
     };
-  
+
     fetchData();
   }, [API_OPTIONS]);
 
+  // Filter exercises based on selected filters
   const filteredExercises = exercises.filter(exercise => {
     const matchesSearch = exercise.name.toLowerCase().includes(filters.search.toLowerCase()) ||
                          exercise.target.toLowerCase().includes(filters.search.toLowerCase());
     const matchesBodyPart = filters.bodyPart === 'all' || exercise.bodyPart === filters.bodyPart;
     const matchesEquipment = filters.equipment === 'all' || exercise.equipment === filters.equipment;
     const matchesTarget = filters.target === 'all' || exercise.target === filters.target;
-  
+
     return matchesSearch && matchesBodyPart && matchesEquipment && matchesTarget;
   });
 
-  // Example of a typed function:
   const addExercise = (exercise: Exercise): void => {
     setCurrentWorkout(prev => ({
       ...prev,
@@ -194,23 +173,15 @@ useEffect(() => {
   };
 
   const saveWorkout = async (): Promise<void> => {
-    if (!session?.user) {
-      alert('Please sign in to save workouts');
-      return;
-    }
-
     if (currentWorkout.name && currentWorkout.exercises.length > 0) {
       setIsSaving(true);
       try {
         const { data, error } = await supabase
           .from('workouts')
-          .insert([
-            {
-              user_id: session.user.id,
-              name: currentWorkout.name,
-              exercises: currentWorkout.exercises
-            }
-          ])
+          .insert([{
+            name: currentWorkout.name,
+            exercises: currentWorkout.exercises
+          }])
           .select()
           .single();
 
@@ -227,10 +198,6 @@ useEffect(() => {
         setIsSaving(false);
       }
     }
-  };
-
-  const handleSignOut = async (): Promise<void> => {
-    await supabase.auth.signOut();
   };
 
   if (loading) {
@@ -262,13 +229,6 @@ useEffect(() => {
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
             Workout Programmer
           </h1>
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-colors"
-          >
-            <LogOut size={20} />
-            Sign Out
-          </button>
         </div>
         
         {/* Workout Name Input */}
