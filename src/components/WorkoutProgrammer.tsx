@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { Search, Dumbbell, Target, Activity, X, Plus, Save, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -13,9 +13,9 @@ interface Exercise {
   bodyPart: string;
   equipment: string;
   target: string;
-  sets?: number;
-  reps?: number;
-  weight?: number;
+  sets: number;
+  reps: number;
+  weight: number;
 }
 
 interface Workout {
@@ -55,13 +55,13 @@ const WorkoutProgrammer = () => {
   const API_KEY = '33dd98ace4msh868aeb43c6ceb9fp1ba196jsnf68435311c26';
   const API_HOST = 'exercisedb.p.rapidapi.com';
 
-  const API_OPTIONS = {
+  const API_OPTIONS = useMemo(() => ({
     method: 'GET',
     headers: {
       'X-RapidAPI-Key': API_KEY,
       'X-RapidAPI-Host': API_HOST
     }
-  };
+  }), []);
 
   // Load workouts from Supabase
   useEffect(() => {
@@ -117,7 +117,7 @@ const WorkoutProgrammer = () => {
     };
 
     fetchData();
-  }, []);
+  }, [API_OPTIONS]);
 
   // Filter exercises based on selected filters
   const filteredExercises = exercises.filter(exercise => {
